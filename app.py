@@ -31,7 +31,8 @@ def run_qpdf(input_path, output_path):
 st.sidebar.header("Optimization Settings")
 mode = st.sidebar.radio(
     "Select Mode:",
-    ("Lossless (QPDF)", "Deep Clean (Ghostscript)")
+    ("Lossless (QPDF)", "Deep Clean (Ghostscript)"),
+    index=1  # 这里将默认值改为了 Ghostscript
 )
 
 # --- Main Logic ---
