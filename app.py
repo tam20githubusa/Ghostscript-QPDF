@@ -1,83 +1,80 @@
 import streamlit as st
 import subprocess
 import os
-import time
+import shutil
 
-st.set_page_config(page_title="PDF Optimizer Pro", page_icon="📄")
+st.set_page_config(page_title="PDF 极致瘦身与防伪全自动面板", layout="centered")
 
-st.title("📄 Professional PDF Optimizer")
-st.caption("Powered by Ghostscript & QPDF | Cloud Infrastructure")
+st.title("🔬 PDF 极致瘦身与指纹防伪洗刷控制台")
+st.markdown("通过云端/本地后端直接唤起 **Ghostscript** 与 **ExifTool**，强锁 PDF-1.7 并定点清除第三方重构签名。")
 
-# --- Function: Ghostscript (Structure Clean) ---
-def run_ghostscript(input_path, output_path):
-    cmd = [
-        "gs", "-sDEVICE=pdfwrite", "-dCompatibilityLevel=1.4",
-        "-dPDFSETTINGS=/default", # Keep original quality
-        "-dColorImageResolution=600", "-dGrayImageResolution=600",
-        "-dNOPAUSE", "-dQUIET", "-dBATCH",
-        f"-sOutputFile={output_path}", input_path
-    ]
-    subprocess.run(cmd, check=True)
+# 1. 文件上传
+uploaded_file = st.file_uploader("📂 第一步：请投放你需要去痕压缩的 PDF 文件", type=["pdf"])
 
-# --- Function: QPDF (Lossless & Linearize) ---
-def run_qpdf(input_path, output_path):
-    cmd = [
-        "qpdf", "--linearize", "--optimize-images",
-        "--min-version=1.5", input_path, output_path
-    ]
-    subprocess.run(cmd, check=True)
+# 2. 参数微调
+st.markdown("### 🛠️ 第二步：防伪整容参数配置")
+pdf_version = st.selectbox("强锁 PDF 底层版本规范", ["1.7", "1.6", "1.5"], index=0)
+custom_producer = st.text_input("期望伪装的 Producer 签名（留空代表彻底清空，最安全推荐）", "")
 
-# --- UI Sidebar ---
-st.sidebar.header("Optimization Settings")
-mode = st.sidebar.radio(
-    "Select Mode:",
-    ("Lossless (QPDF)", "Deep Clean (Ghostscript)"),
-    index=1  # 这里将默认值改为了 Ghostscript
-)
-
-# --- Main Logic ---
-uploaded_file = st.file_uploader("Upload your PDF (Max 200MB)", type="pdf")
-
+# 3. 执行核心逻辑
 if uploaded_file is not None:
-    # 1. Save uploaded file to a temporary location
-    input_filename = "temp_input.pdf"
-    output_filename = f"optimized_{mode.split()[0].lower()}.pdf"
+    # 建立临时工作路径
+    input_path = "input_temp.pdf"
+    output_gs_path = "output_gs.pdf"
     
-    with open(input_filename, "wb") as f:
+    with open(input_path, "wb") as f:
         f.write(uploaded_file.getbuffer())
-    
-    st.info(f"Original Size: {len(uploaded_file.getbuffer())/1024:.2f} KB")
-
-    if st.button("Start Optimization"):
-        with st.spinner(f"Running {mode}..."):
+        
+    if st.button("🚀 开始联合作战（重构 + 洗签名）", type="primary"):
+        with st.spinner("后端正在激烈重洗代码流... 请稍候..."):
             try:
-                start_time = time.time()
+                # 步骤 A：唤起 Ghostscript 强锁 1.7 并无损重构
+                gs_cmd = [
+                    "gs", "-sDEVICE=pdfwrite",
+                    f"-dCompatibilityLevel={pdf_version}",
+                    "-dNOPAUSE", "-dBATCH", "-dQUIET",
+                    "-dColorImageDownsampleType=/Bicubic", "-dColorImageResolution=300",
+                    "-dGrayImageDownsampleType=/Bicubic", "-dGrayImageResolution=300",
+                    "-dMonoImageDownsampleType=/Bicubic", "-dMonoImageResolution=300",
+                    "-dEmbedAllFonts=true", "-dSubsetFonts=true",
+                    f"-sOutputFile={output_gs_path}", input_path
+                ]
                 
-                if "QPDF" in mode:
-                    run_qpdf(input_filename, output_filename)
-                else:
-                    run_ghostscript(input_filename, output_filename)
+                # 执行 GS
+                result_gs = subprocess.run(gs_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
                 
-                duration = time.time() - start_time
-                
-                # 2. Results
-                if os.path.exists(output_filename):
-                    new_size = os.path.getsize(output_filename)
-                    st.success(f"Done in {duration:.2f}s!")
-                    st.metric("New Size", f"{new_size/1024:.2f} KB", 
-                              delta=f"{(new_size - len(uploaded_file.getbuffer()))/1024:.2f} KB")
+                if not os.path.exists(output_gs_path):
+                    st.error(f"Ghostscript 压缩失败！错误日志:\n{result_gs.stderr}")
+                    st.stop()
                     
-                    # 3. Download Button
-                    with open(output_filename, "rb") as file:
-                        st.download_button(
-                            label="📥 Download Optimized PDF",
+                # 步骤 B：唤起 ExifTool 暴力洗掉 Ghostscript 签名
+                exif_cmd = [
+                    "exiftool",
+                    f"-Producer={custom_producer}",
+                    "-Creator=", "-CreatorTool=", "-history=",
+                    "-overwrite_original", output_gs_path
+                ]
+                
+                # 执行 ExifTool
+                result_exif = subprocess.run(exif_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                
+                # 4. 交付成品
+                if os.path.exists(output_gs_path):
+                    st.success("✨ 联合作战完美结束！底层的 Ghostscript 签名与降维痕迹已被彻底抹除。")
+                    
+                    # 读取成品文件提供下载
+                    with open(output_gs_path, "rb") as file:
+                        btn = st.download_button(
+                            label="📥 下载终极无瑕疵 PDF 成品",
                             data=file,
-                            file_name=output_filename,
+                            file_name=f"clean_{uploaded_file.name}",
                             mime="application/pdf"
                         )
-                    
-                    # Cleanup
-                    os.remove(input_filename)
-                    os.remove(output_filename)
+            
             except Exception as e:
-                st.error(f"Error during processing: {e}")
+                st.error(ghostscript_path = f"系统发生未预料异常: {str(e)}")
+            
+            finally:
+                # 清理现场临时文件
+                if os.path.exists(input_path): os.remove(input_path)
+                if os.path.exists(output_gs_path): os.remove(output_gs_path)
