@@ -15,11 +15,20 @@ st.markdown("### 🛠️ 第二步：防伪整容参数配置")
 pdf_version = st.selectbox("强锁 PDF 底层版本规范", ["1.7", "1.6", "1.5"], index=0)
 custom_producer = st.text_input("期望伪装的 Producer 签名（留空代表彻底清空，最安全推荐）", "")
 
+def format_bytes(size_in_bytes):
+    if size_in_bytes == 0: return '0 Bytes'
+    for unit in ['Bytes', 'KB', 'MB', 'GB']:
+        if size_in_bytes < 1024:
+            return f"{size_in_bytes:.2f} {unit}"
+        size_in_bytes /= 1024
+
 # 3. 执行核心逻辑
 if uploaded_file is not None:
-    # 建立临时工作路径
     input_path = "input_temp.pdf"
     output_gs_path = "output_gs.pdf"
+    
+    # 获取原始大小
+    raw_bytes = uploaded_file.getbuffer().nbytes
     
     with open(input_path, "wb") as f:
         f.write(uploaded_file.getbuffer())
@@ -41,7 +50,6 @@ if uploaded_file is not None:
                     f"-sOutputFile={output_gs_path}", input_path
                 ]
                 
-                # 执行 GS
                 result_gs = subprocess.run(gs_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
                 
                 if not os.path.exists(output_gs_path):
@@ -49,44 +57,53 @@ if uploaded_file is not None:
                     st.stop()
                     
                 # ==========================================
-                # 步骤 B：修复后的 ExifTool 精准洗签名逻辑 (Linux 兼容版)
+                # 步骤 B：【地毯式轰炸】ExifTool 彻底粉碎 XML 元数据流
                 # ==========================================
+                # 不仅删除单独的 Producer，而是将底层的 XMP 字典、XML 描述块直接物理注销
                 if custom_producer.strip() == "":
-                    # 如果用户留空，使用 ExifTool 在 Linux/Python 传参下唯一的“物理抠除”语法
-                    # 参数后面不接任何东西（直接截断），代表彻底删掉这些字典键值
                     exif_cmd = [
                         "exiftool",
+                        "-all=",                 # 核心：直接斩断并清空所有元数据字典、XML数据流
+                        "-pdf:all=",             # 清空 PDF 专属内部标签
+                        "-xmp:all=",             # 彻底粉碎隐藏在 XML 流里的特征
                         "-Producer=", 
                         "-Creator=", 
                         "-CreatorTool=", 
                         "-history=",
-                        "-MetadataDate=",
-                        "-ModifyDate=",
                         "-overwrite_original", 
                         output_gs_path
                     ]
                 else:
-                    # 如果用户输入了伪装文本（比如“官方原生导出”），则执行强制覆盖
                     exif_cmd = [
                         "exiftool",
-                        f"-Producer={custom_producer}",
+                        "-all=",                 # 先清除干净所有隐藏流
+                        "-pdf:all=",
+                        "-xmp:all=",
+                        f"-Producer={custom_producer}", # 再反向写入你指定的伪装签名
                         "-Creator=", 
                         "-CreatorTool=", 
                         "-history=",
-                        "-MetadataDate=",
-                        "-ModifyDate=",
                         "-overwrite_original", 
                         output_gs_path
                     ]
                 
-                # 执行 ExifTool
+                # 执行地毯式清理
                 result_exif = subprocess.run(exif_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
                 
                 # ==========================================
-                # 4. 交付成品
+                # 4. 交付成品与数据反馈
                 # ==========================================
                 if os.path.exists(output_gs_path):
-                    st.success("✨ 联合作战完美结束！底层的 Ghostscript 签名与降维痕迹已被彻底抹除。")
+                    clean_bytes = os.path.getsize(output_gs_path)
+                    saved_ratio = (1 - (clean_bytes / raw_bytes)) * 100
+                    
+                    st.success("✨ 联合作战完美结束！底层的影子元数据与压缩流已被彻底解构。")
+                    
+                    # 📊 明确显示压缩完的文件大小数据面板
+                    col1, col2, col3 = st.columns(3)
+                    col1.metric("原始文件大小", format_bytes(raw_bytes))
+                    col2.metric("优化去痕后大小", format_bytes(clean_bytes))
+                    col3.metric("整体瘦身率", f"{saved_ratio:.1f}%")
                     
                     # 读取成品文件提供下载
                     with open(output_gs_path, "rb") as file:
@@ -101,5 +118,4 @@ if uploaded_file is not None:
                 st.error(f"系统发生未预料异常: {str(e)}")
             
             finally:
-                # 清理现场临时文件，防止服务器存储泄露
                 if os.path.exists(input_path): os.remove(input_path)
