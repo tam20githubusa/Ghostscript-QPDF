@@ -1,12 +1,11 @@
 import streamlit as st
 import subprocess
 import os
-import re
 
 st.set_page_config(page_title="PDF 极致瘦身与防伪全自动面板", layout="centered")
 
 st.title("🔬 PDF 极致瘦身与指纹防伪洗刷控制台")
-st.markdown("通过云端/本地后端直接唤起 **Ghostscript**，强锁 PDF-1.7 并结合【字体加号前缀硬洗】实现终极无痕。")
+st.markdown("通过云端/本地后端直接唤起 **Ghostscript**，强锁 PDF-1.7 并结合【二进制明文重洗】彻底抠除底层痕迹。")
 
 # 1. 文件上传
 uploaded_file = st.file_uploader("📂 第一步：请投放你需要去痕压缩的 PDF 文件", type=["pdf"])
@@ -28,18 +27,18 @@ if uploaded_file is not None:
     input_path = "input_temp.pdf"
     output_gs_path = "output_gs.pdf"
     
+    # 获取原始大小
     raw_bytes = uploaded_file.getbuffer().nbytes
     
     with open(input_path, "wb") as f:
         f.write(uploaded_file.getbuffer())
         
-    if st.button("🚀 开始终极无痕重构（强洗加号前缀）", type="primary"):
-        with st.spinner("正在强力逆转字体流基因... 请稍候..."):
+    if st.button("🚀 开始联合作战（重构 + 字节流硬清除）", type="primary"):
+        with st.spinner("后端正在激烈重洗代码流... 请稍候..."):
             try:
                 # ==========================================
-                # 步骤 A：唤起 Ghostscript 压缩并重构
+                # 步骤 A：唤起 Ghostscript 强锁版本并无损重构
                 # ==========================================
-                # 恢复为标准的子集化压缩，先把体积压到最小，后续用 Python 手动剥离加号
                 gs_cmd = [
                     "gs", "-sDEVICE=pdfwrite",
                     f"-dCompatibilityLevel={pdf_version}",
@@ -47,7 +46,7 @@ if uploaded_file is not None:
                     "-dColorImageDownsampleType=/Bicubic", "-dColorImageResolution=300",
                     "-dGrayImageDownsampleType=/Bicubic", "-dGrayImageResolution=300",
                     "-dMonoImageDownsampleType=/Bicubic", "-dMonoImageResolution=300",
-                    "-dEmbedAllFonts=true", "-dSubsetFonts=true", 
+                    "-dEmbedAllFonts=true", "-dSubsetFonts=true",
                     f"-sOutputFile={output_gs_path}", input_path
                 ]
                 
@@ -58,35 +57,39 @@ if uploaded_file is not None:
                     st.stop()
                     
                 # ==========================================
-                # 步骤 B：纯内存二进制硬洗 (签名 + 字体加号前缀)
+                # 步骤 B：【核心必杀技】Python 纯内存二进制明文替换
                 # ==========================================
                 with open(output_gs_path, "rb") as f:
                     pdf_data = f.read()
 
-                # 1. 刺杀 Ghostscript 相关所有文本特征
-                targets = [b"GPL Ghostscript 10.05.1", b"GPL Ghostscript 10.05", b"GPL Ghostscript", b"Ghostscript"]
+                # 转换目标签名的各种可能形态为二进制字节流
+                targets = [
+                    b"GPL Ghostscript 10.05.1",
+                    b"GPL Ghostscript 10.05",
+                    b"GPL Ghostscript",
+                    b"Ghostscript"
+                ]
+
+                # 设定替换后的伪装物（必须保持等长，否则PDF索引会错位崩溃）
+                # 如果用户留空，用等长空格物理覆盖；如果用户写了，用伪装字符等长截断或填充
                 for target in targets:
                     if target in pdf_data:
                         t_len = len(target)
                         if custom_producer.strip() == "":
+                            # 用完全等长的纯空格抹平它
                             replacement = b" " * t_len
                         else:
+                            # 用自定义字符填充，长了就截断，短了就补空格，必须维持 t_len 长度不变
                             p_bytes = custom_producer.encode('latin1')
-                            replacement = p_bytes[:t_len] if len(p_bytes) >= t_len else p_bytes + b" " * (t_len - len(p_bytes))
+                            if len(p_bytes) >= t_len:
+                                replacement = p_bytes[:t_len]
+                            else:
+                                replacement = p_bytes + b" " * (t_len - len(p_bytes))
+                        
+                        # 执行二进制暴力替换
                         pdf_data = pdf_data.replace(target, replacement)
 
-                # 2. 核心绝杀：使用正则在二进制中剔除 `XXXXXX+` 字体前缀
-                # PDF底层字体名通常以斜杠开头，如 /AAAAAA+SimSun，匹配 6位大写字母+加号
-                def remove_font_prefix(match):
-                    # match.group(0) 是类似于 b'/ABCDEF+' 的数据
-                    # 我们把它替换为同等长度的空格加斜杠，维持二进制文件指针完全对齐，绝不破坏物理结构
-                    matched_str = match.group(0)
-                    return b"/" + b" " * (len(matched_str) - 1)
-
-                # 匹配 / 后面跟着 6 个大写字母，再跟着一个加号的二进制特征
-                pdf_data = re.sub(rb'/[A-Z]{6}\+', remove_font_prefix, pdf_data)
-
-                # 将彻底洗净的二进制数据覆写回成品
+                # 将洗得干干净净的二进制数据重新覆写回文件
                 with open(output_gs_path, "wb") as f:
                     f.write(pdf_data)
 
@@ -97,15 +100,17 @@ if uploaded_file is not None:
                     clean_bytes = os.path.getsize(output_gs_path)
                     saved_ratio = (1 - (clean_bytes / raw_bytes)) * 100
                     
-                    st.success("✨ 终极去痕重构结束！加号前缀与引擎特征已被物理性蒸发。")
+                    st.success("✨ 终极去痕重构结束！已强制从二进制底层数据流中擦除 Ghostscript 印记。")
                     
+                    # 📊 数据面板显示
                     col1, col2, col3 = st.columns(3)
                     col1.metric("原始文件大小", format_bytes(raw_bytes))
                     col2.metric("优化去痕后大小", format_bytes(clean_bytes))
                     col3.metric("整体瘦身率", f"{saved_ratio:.1f}%")
                     
+                    # 读取成品文件提供下载
                     with open(output_gs_path, "rb") as file:
-                        st.download_button(
+                        btn = st.download_button(
                             label="📥 下载终极无瑕疵 PDF 成品",
                             data=file,
                             file_name=f"clean_{uploaded_file.name}",
