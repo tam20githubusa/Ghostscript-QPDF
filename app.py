@@ -1,7 +1,6 @@
 import streamlit as st
 import subprocess
 import os
-import shutil
 
 st.set_page_config(page_title="PDF 极致瘦身与防伪全自动面板", layout="centered")
 
@@ -28,7 +27,9 @@ if uploaded_file is not None:
     if st.button("🚀 开始联合作战（重构 + 洗签名）", type="primary"):
         with st.spinner("后端正在激烈重洗代码流... 请稍候..."):
             try:
-                # 步骤 A：唤起 Ghostscript 强锁 1.7 并无损重构
+                # ==========================================
+                # 步骤 A：唤起 Ghostscript 强锁版本并无损重构
+                # ==========================================
                 gs_cmd = [
                     "gs", "-sDEVICE=pdfwrite",
                     f"-dCompatibilityLevel={pdf_version}",
@@ -47,18 +48,43 @@ if uploaded_file is not None:
                     st.error(f"Ghostscript 压缩失败！错误日志:\n{result_gs.stderr}")
                     st.stop()
                     
-                # 步骤 B：唤起 ExifTool 暴力洗掉 Ghostscript 签名
-                exif_cmd = [
-                    "exiftool",
-                    f"-Producer={custom_producer}",
-                    "-Creator=", "-CreatorTool=", "-history=",
-                    "-overwrite_original", output_gs_path
-                ]
+                # ==========================================
+                # 步骤 B：修复后的 ExifTool 精准洗签名逻辑 (Linux 兼容版)
+                # ==========================================
+                if custom_producer.strip() == "":
+                    # 如果用户留空，使用 ExifTool 在 Linux/Python 传参下唯一的“物理抠除”语法
+                    # 参数后面不接任何东西（直接截断），代表彻底删掉这些字典键值
+                    exif_cmd = [
+                        "exiftool",
+                        "-Producer=", 
+                        "-Creator=", 
+                        "-CreatorTool=", 
+                        "-history=",
+                        "-MetadataDate=",
+                        "-ModifyDate=",
+                        "-overwrite_original", 
+                        output_gs_path
+                    ]
+                else:
+                    # 如果用户输入了伪装文本（比如“官方原生导出”），则执行强制覆盖
+                    exif_cmd = [
+                        "exiftool",
+                        f"-Producer={custom_producer}",
+                        "-Creator=", 
+                        "-CreatorTool=", 
+                        "-history=",
+                        "-MetadataDate=",
+                        "-ModifyDate=",
+                        "-overwrite_original", 
+                        output_gs_path
+                    ]
                 
                 # 执行 ExifTool
                 result_exif = subprocess.run(exif_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
                 
+                # ==========================================
                 # 4. 交付成品
+                # ==========================================
                 if os.path.exists(output_gs_path):
                     st.success("✨ 联合作战完美结束！底层的 Ghostscript 签名与降维痕迹已被彻底抹除。")
                     
@@ -72,9 +98,8 @@ if uploaded_file is not None:
                         )
             
             except Exception as e:
-                st.error(ghostscript_path = f"系统发生未预料异常: {str(e)}")
+                st.error(f"系统发生未预料异常: {str(e)}")
             
             finally:
-                # 清理现场临时文件
+                # 清理现场临时文件，防止服务器存储泄露
                 if os.path.exists(input_path): os.remove(input_path)
-                if os.path.exists(output_gs_path): os.remove(output_gs_path)
