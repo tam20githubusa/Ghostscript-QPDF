@@ -46,7 +46,7 @@ if uploaded_file is not None:
                     "-dColorImageDownsampleType=/Bicubic", "-dColorImageResolution=300",
                     "-dGrayImageDownsampleType=/Bicubic", "-dGrayImageResolution=300",
                     "-dMonoImageDownsampleType=/Bicubic", "-dMonoImageResolution=300",
-                    "-dEmbedAllFonts=true", "-dSubsetFonts=true",
+                    "-dEmbedAllFonts=true", "-dSubsetFonts=false",
                     f"-sOutputFile={output_gs_path}", input_path
                 ]
                 
